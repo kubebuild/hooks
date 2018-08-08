@@ -20,6 +20,7 @@ const (
 	githubPath    = "/github"
 	gitlabPath    = "/gitlab"
 	bitbucketPath = "/bitbucket"
+	healthPath    = "/"
 )
 
 var (
@@ -40,6 +41,7 @@ func newLogger() *logrus.Logger {
 	return log
 }
 func main() {
+	http.HandleFunc(healthPath, handleHealth)
 	http.HandleFunc(githubPath, handleGithub)
 	http.HandleFunc(gitlabPath, handleGitlab)
 	http.HandleFunc(bitbucketPath, handleBitbucket)
@@ -88,6 +90,9 @@ func extractToken(r *http.Request) string {
 	return tokenArr[0]
 }
 
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("OK"))
+}
 func handleGithub(w http.ResponseWriter, r *http.Request) {
 	token := extractToken(r)
 	payload, err := githubHook.Parse(r, github.PushEvent, github.PullRequestEvent)
