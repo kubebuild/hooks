@@ -20,7 +20,7 @@ ingress:
     # kubernetes.io/tls-acme: "true"
   path: /
   hosts:
-    - webhooks.kubebuild.com
+    - webhook.kubebuild.com
   tls: []
   #  - secretName: chart-example-tls
   #    hosts:
