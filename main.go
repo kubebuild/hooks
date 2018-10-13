@@ -28,8 +28,8 @@ var (
 	githubHook, _    = github.New()
 	gitlabHook, _    = gitlab.New()
 	bitbucketHook, _ = bitbucket.New()
-	// graphqlClient    = graphql.NewClient("https://api.kubebuild.com/graphql", nil)
-	graphqlClient = graphql.NewClient("http://localhost:4000/graphql", nil)
+	graphqlClient    = graphql.NewClient("https://api.kubebuild.com/graphql", nil)
+	// graphqlClient = graphql.NewClient("http://localhost:4000/graphql", nil)
 )
 
 func newLogger() *logrus.Logger {
