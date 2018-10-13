@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -29,8 +28,8 @@ var (
 	githubHook, _    = github.New()
 	gitlabHook, _    = gitlab.New()
 	bitbucketHook, _ = bitbucket.New()
-	graphqlClient    = graphql.NewClient("https://api.kubebuild.com/graphql", nil)
-	// graphqlClient = graphql.NewClient("http://localhost:4000/graphql", nil)
+	// graphqlClient    = graphql.NewClient("https://api.kubebuild.com/graphql", nil)
+	graphqlClient = graphql.NewClient("http://localhost:4000/graphql", nil)
 )
 
 func newLogger() *logrus.Logger {
@@ -55,26 +54,27 @@ func parseRef(ref string) string {
 	return branch
 }
 
-func createBuild(token string, commit string, message string, ref string, createdBy interface{}) {
+func createBuild(token string, commit string, message string, ref string, userEmail string, userName string) {
 	branch := parseRef(ref)
 	log.WithFields(logrus.Fields{
 		"commit":    commit,
 		"message":   message,
 		"branch":    branch,
-		"createdBy": createdBy,
+		"userEmail": userEmail,
+		"userName":  userName,
 	}).Info("createBuild")
 	var buildMutation struct {
 		CreateBuildByToken struct {
 			Successful graphql.Boolean
-		} `graphql:"createBuildByToken(token: $token, commit: $commit, message: $message, branch: $branch, createdBy: $createdBy)"`
+		} `graphql:"createBuildByToken(token: $token, commit: $commit, message: $message, branch: $branch, userEmail: $userEmail, userName: $userName)"`
 	}
-	createdByJSON, _ := json.Marshal(createdBy)
 	variables := map[string]interface{}{
 		"token":     token,
 		"commit":    commit,
 		"message":   message,
 		"branch":    branch,
-		"createdBy": createdByJSON,
+		"userEmail": userEmail,
+		"userName":  userName,
 	}
 	err := graphqlClient.Mutate(context.Background(), &buildMutation, variables)
 	if err != nil {
@@ -107,20 +107,22 @@ func handleGithub(w http.ResponseWriter, r *http.Request) {
 
 	case github.PushPayload:
 		push := payload.(github.PushPayload)
-		createdBy := map[string]string{
-			"name":  push.HeadCommit.Author.Name,
-			"email": push.HeadCommit.Author.Email,
-		}
-		createBuild(token, push.After, push.HeadCommit.Message, push.Ref, createdBy)
+		createBuild(token,
+			push.After,
+			push.HeadCommit.Message,
+			push.Ref,
+			push.HeadCommit.Author.Email,
+			push.HeadCommit.Author.Name)
 
 	case github.PullRequestPayload:
 		pullRequest := payload.(github.PullRequestPayload)
 		if pullRequest.Action == "opened" {
-			createdBy := map[string]string{
-				"name":  pullRequest.Sender.Login,
-				"email": pullRequest.Sender.Login,
-			}
-			createBuild(token, pullRequest.PullRequest.Head.Sha, pullRequest.PullRequest.Body, pullRequest.PullRequest.Head.Ref, createdBy)
+			createBuild(token,
+				pullRequest.PullRequest.Head.Sha,
+				pullRequest.PullRequest.Body,
+				pullRequest.PullRequest.Head.Ref,
+				pullRequest.Sender.Login,
+				pullRequest.Sender.Login)
 		}
 	}
 }
@@ -137,11 +139,12 @@ func handleGitlab(w http.ResponseWriter, r *http.Request) {
 
 	case gitlab.PushEventPayload:
 		push := payload.(gitlab.PushEventPayload)
-		createdBy := map[string]string{
-			"name":  push.Commits[0].Author.Name,
-			"email": push.Commits[0].Author.Email,
-		}
-		createBuild(token, push.After, push.Commits[0].Message, push.Ref, createdBy)
+		createBuild(token,
+			push.After,
+			push.Commits[0].Message,
+			push.Ref,
+			push.Commits[0].Author.Email,
+			push.Commits[0].Author.Name)
 	}
 }
 
@@ -161,11 +164,6 @@ func handleBitbucket(w http.ResponseWriter, r *http.Request) {
 		commit := push.Push.Changes[0].New.Target.Hash
 		message := push.Push.Changes[0].New.Target.Message
 		ref := push.Push.Changes[0].New.Type
-		user := push.Actor.Username
-		createdBy := map[string]string{
-			"name":  user,
-			"email": user,
-		}
-		createBuild(token, commit, message, ref, createdBy)
+		createBuild(token, commit, message, ref, push.Actor.Username, push.Actor.Username)
 	}
 }
