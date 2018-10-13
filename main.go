@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -67,12 +68,13 @@ func createBuild(token string, commit string, message string, ref string, create
 			Successful graphql.Boolean
 		} `graphql:"createBuildByToken(token: $token, commit: $commit, message: $message, branch: $branch, createdBy: $createdBy)"`
 	}
+	createdByJSON, _ := json.Marshal(createdBy)
 	variables := map[string]interface{}{
 		"token":     token,
 		"commit":    commit,
 		"message":   message,
 		"branch":    branch,
-		"createdBy": createdBy,
+		"createdBy": createdByJSON,
 	}
 	err := graphqlClient.Mutate(context.Background(), &buildMutation, variables)
 	if err != nil {
