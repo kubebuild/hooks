@@ -54,8 +54,7 @@ func parseRef(ref string) string {
 	return branch
 }
 
-func createBuild(token string, commit string, message string, ref string, userEmail string, userName string) {
-	branch := parseRef(ref)
+func createBuild(token string, commit string, message string, branch string, userEmail string, userName string) {
 	log.WithFields(logrus.Fields{
 		"commit":    commit,
 		"message":   message,
@@ -110,7 +109,7 @@ func handleGithub(w http.ResponseWriter, r *http.Request) {
 		createBuild(token,
 			push.After,
 			push.HeadCommit.Message,
-			push.Ref,
+			parseRef(push.Ref),
 			push.HeadCommit.Author.Email,
 			push.HeadCommit.Author.Name)
 
@@ -142,7 +141,7 @@ func handleGitlab(w http.ResponseWriter, r *http.Request) {
 		createBuild(token,
 			push.After,
 			push.Commits[0].Message,
-			push.Ref,
+			parseRef(push.Ref),
 			push.Commits[0].Author.Email,
 			push.Commits[0].Author.Name)
 	}
@@ -163,7 +162,7 @@ func handleBitbucket(w http.ResponseWriter, r *http.Request) {
 		push := payload.(bitbucket.RepoPushPayload)
 		commit := push.Push.Changes[0].New.Target.Hash
 		message := push.Push.Changes[0].New.Target.Message
-		ref := push.Push.Changes[0].New.Type
+		ref := parseRef(push.Push.Changes[0].New.Type)
 		createBuild(token, commit, message, ref, push.Actor.Username, push.Actor.Username)
 	}
 }
