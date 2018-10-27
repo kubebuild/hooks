@@ -118,7 +118,7 @@ func handleGithub(w http.ResponseWriter, r *http.Request) {
 		if pullRequest.Action == "opened" {
 			createBuild(token,
 				pullRequest.PullRequest.Head.Sha,
-				pullRequest.PullRequest.Body,
+				pullRequest.PullRequest.Title,
 				pullRequest.PullRequest.Head.Ref,
 				pullRequest.Sender.Login,
 				pullRequest.Sender.Login)
