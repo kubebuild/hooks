@@ -6,7 +6,7 @@ replicaCount: 2
 
 image:
   repository: kubebuild/webhooks
-  tag: latest
+  tag: 980a5e
   pullPolicy: IfNotPresent
 
 service:
