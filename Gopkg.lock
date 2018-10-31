@@ -2,55 +2,101 @@
 
 
 [[projects]]
+  digest = "1:d867dfa6751c8d7a435821ad3b736310c2ed68945d05b50fb9d23aee0540c8cc"
   name = "github.com/Sirupsen/logrus"
   packages = ["."]
+  pruneopts = "UT"
   revision = "3e01752db0189b9157070a0e1668a620f9a85da2"
   version = "v1.0.6"
 
 [[projects]]
+  digest = "1:a9ef0c82c0459e56e52a374cff03bc7b21a2e76bd957cc368fafd23ca0ba0b45"
+  name = "github.com/bugsnag/bugsnag-go"
+  packages = [
+    ".",
+    "errors",
+  ]
+  pruneopts = "UT"
+  revision = "3f5889f222e9c07aa1f62c5e8c202e402ce574cd"
+  version = "v1.3.2"
+
+[[projects]]
+  digest = "1:3049c43c6d1cfaa347acd27d6342187f8f38d9f416bbba7b02b43f82848302d2"
+  name = "github.com/bugsnag/panicwrap"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "4009b2b7c78d820cc4a2e42f035bb557ce4ae45b"
+  version = "v1.2.0"
+
+[[projects]]
   branch = "master"
+  digest = "1:caf6db28595425c0e0f2301a00257d11712f65c1878e12cffc42f6b9a9cf3f23"
+  name = "github.com/kardianos/osext"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "ae77be60afb1dcacde03767a8c37337fad28ac14"
+
+[[projects]]
+  branch = "master"
+  digest = "1:ddaa79b37808fbd09a1c3f484bba6320c884664dfc25ccc5f2d7d5a82222177c"
   name = "github.com/shurcooL/go"
   packages = ["ctxhttp"]
+  pruneopts = "UT"
   revision = "9e1955d9fb6e1ee2345ba1f5e71669263e719e27"
 
 [[projects]]
   branch = "master"
+  digest = "1:a8f210a8beb6984176d56d38660ac0116f79d8c337db1caa136d4bbc13348c92"
   name = "github.com/shurcooL/graphql"
   packages = [
     ".",
     "ident",
-    "internal/jsonutil"
+    "internal/jsonutil",
   ]
+  pruneopts = "UT"
   revision = "62c9ce094e75302d560f7adcdf16c06d05aaa958"
 
 [[projects]]
   branch = "master"
+  digest = "1:3f3a05ae0b95893d90b9b3b5afdb79a9b3d96e4e36e099d841ae602e4aca0da8"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
+  pruneopts = "UT"
   revision = "f027049dab0ad238e394a753dba2d14753473a04"
 
 [[projects]]
   branch = "master"
+  digest = "1:2455630696ece2771aab91b25300a375df10b948d43d1b565feda5d89afd2bde"
   name = "golang.org/x/sys"
   packages = [
     "unix",
-    "windows"
+    "windows",
   ]
+  pruneopts = "UT"
   revision = "acbc56fc7007d2a01796d5bde54f39e3b3e95945"
 
 [[projects]]
+  digest = "1:48a51ee11664bdaf54e16056b295f69d750eb719a900ad4b44cee8e920427552"
   name = "gopkg.in/go-playground/webhooks.v5"
   packages = [
     "bitbucket",
     "github",
-    "gitlab"
+    "gitlab",
   ]
+  pruneopts = "UT"
   revision = "206a8b42fd268e38840b874be54de8f0987086cd"
   version = "v5.0.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6a25fb41038754d06dc0c503d4d1f96206005e277fee54ce433912560d1d1bfc"
+  input-imports = [
+    "github.com/Sirupsen/logrus",
+    "github.com/bugsnag/bugsnag-go",
+    "github.com/shurcooL/graphql",
+    "gopkg.in/go-playground/webhooks.v5/bitbucket",
+    "gopkg.in/go-playground/webhooks.v5/github",
+    "gopkg.in/go-playground/webhooks.v5/gitlab",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1

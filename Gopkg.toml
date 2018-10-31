@@ -40,3 +40,7 @@
 [prune]
   go-tests = true
   unused-packages = true
+
+[[constraint]]
+  name = "github.com/bugsnag/bugsnag-go"
+  version = "1.3.2"

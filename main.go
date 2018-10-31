@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/Sirupsen/logrus"
+	bugsnag "github.com/bugsnag/bugsnag-go"
 	"github.com/shurcooL/graphql"
 	"gopkg.in/go-playground/webhooks.v5/bitbucket"
 	"gopkg.in/go-playground/webhooks.v5/github"
@@ -41,11 +42,18 @@ func newLogger() *logrus.Logger {
 	return log
 }
 func main() {
+
+	bugsnag.Configure(bugsnag.Configuration{
+		APIKey: os.Getenv("BUGSNAG_API_KEY"),
+		// The import paths for the Go packages
+		// containing your source files
+		ProjectPackages: []string{"main", "github.com/kubebuild/webhook"},
+	})
 	http.HandleFunc(healthPath, handleHealth)
 	http.HandleFunc(githubPath, handleGithub)
 	http.HandleFunc(gitlabPath, handleGitlab)
 	http.HandleFunc(bitbucketPath, handleBitbucket)
-	http.ListenAndServe(":9000", nil)
+	http.ListenAndServe(":9000", bugsnag.Handler(nil))
 }
 
 func parseRef(ref string) string {
