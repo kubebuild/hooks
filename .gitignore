@@ -12,3 +12,4 @@
 *.out
 vendor/
 kubebuild-agent
+scripts/.env
