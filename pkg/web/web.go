@@ -1,17 +1,17 @@
-package main
+package web
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"regexp"
-	"time"
 
 	"net/http"
 
-	"github.com/Sirupsen/logrus"
 	bugsnag "github.com/bugsnag/bugsnag-go"
-	"github.com/shurcooL/graphql"
+	"github.com/cloudflare/cfssl/log"
+	"github.com/kubebuild/webhooks/pkg/graphql"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 	"gopkg.in/go-playground/webhooks.v5/bitbucket"
 	"gopkg.in/go-playground/webhooks.v5/github"
 	"gopkg.in/go-playground/webhooks.v5/gitlab"
@@ -25,23 +25,25 @@ const (
 )
 
 var (
-	log              = newLogger()
 	githubHook, _    = github.New()
 	gitlabHook, _    = gitlab.New()
 	bitbucketHook, _ = bitbucket.New()
-	graphqlClient    = graphql.NewClient("https://api.kubebuild.com/graphql", nil)
-	// graphqlClient = graphql.NewClient("http://localhost:4000/graphql", nil)
 )
 
-func newLogger() *logrus.Logger {
-	logLevel, _ := logrus.ParseLevel("info")
-	log := logrus.New()
-	log.Formatter = &logrus.JSONFormatter{TimestampFormat: time.RFC3339Nano}
-	log.Level = logLevel
-	log.Out = os.Stdout
-	return log
+//Web interface for web client
+type Web struct {
+	log           *logrus.Logger
+	graphqlClient *graphql.Client
 }
-func main() {
+
+var requestGroup singleflight.Group
+
+// NewWeb instantiate web
+func NewWeb(log *logrus.Logger, graphqlClient *graphql.Client) *Web {
+	web := &Web{
+		log:           log,
+		graphqlClient: graphqlClient,
+	}
 
 	bugsnag.Configure(bugsnag.Configuration{
 		APIKey: os.Getenv("BUGSNAG_API_KEY"),
@@ -49,11 +51,12 @@ func main() {
 		// containing your source files
 		ProjectPackages: []string{"main", "github.com/kubebuild/webhook"},
 	})
-	http.HandleFunc(healthPath, handleHealth)
-	http.HandleFunc(githubPath, handleGithub)
-	http.HandleFunc(gitlabPath, handleGitlab)
-	http.HandleFunc(bitbucketPath, handleBitbucket)
+	http.HandleFunc(healthPath, web.handleHealth)
+	http.HandleFunc(githubPath, web.handleGithub)
+	http.HandleFunc(gitlabPath, web.handleGitlab)
+	http.HandleFunc(bitbucketPath, web.handleBitbucket)
 	http.ListenAndServe(":9000", bugsnag.Handler(nil))
+	return web
 }
 
 func parseRef(ref string) string {
@@ -62,32 +65,17 @@ func parseRef(ref string) string {
 	return branch
 }
 
-func createBuild(token string, commit string, message string, branch string, userEmail string, userName string) {
-	log.WithFields(logrus.Fields{
-		"commit":    commit,
-		"message":   message,
-		"branch":    branch,
-		"userEmail": userEmail,
-		"userName":  userName,
-	}).Info("createBuild")
-	var buildMutation struct {
-		CreateBuildByToken struct {
-			Successful graphql.Boolean
-		} `graphql:"createBuildByToken(token: $token, commit: $commit, message: $message, branch: $branch, userEmail: $userEmail, userName: $userName)"`
+func (wb *Web) createBuild(token string, commit string, message string, branch string, userEmail string, userName string, pullRequestURL *string) {
+	params := &graphql.BuildCreateParams{
+		Token:          token,
+		Commit:         commit,
+		Message:        message,
+		Branch:         branch,
+		UserEmail:      userEmail,
+		UserName:       userName,
+		PullRequestURL: pullRequestURL,
 	}
-	variables := map[string]interface{}{
-		"token":     token,
-		"commit":    commit,
-		"message":   message,
-		"branch":    branch,
-		"userEmail": userEmail,
-		"userName":  userName,
-	}
-	err := graphqlClient.Mutate(context.Background(), &buildMutation, variables)
-	if err != nil {
-		log.Error(err)
-	}
-	log.WithField("successful", &buildMutation.CreateBuildByToken.Successful).Info("create result")
+	wb.graphqlClient.CreateBuild(params)
 }
 
 func extractToken(r *http.Request) string {
@@ -99,10 +87,10 @@ func extractToken(r *http.Request) string {
 	return tokenArr[0]
 }
 
-func handleHealth(w http.ResponseWriter, r *http.Request) {
+func (wb *Web) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK"))
 }
-func handleGithub(w http.ResponseWriter, r *http.Request) {
+func (wb *Web) handleGithub(w http.ResponseWriter, r *http.Request) {
 	token := extractToken(r)
 	payload, err := githubHook.Parse(r, github.PushEvent, github.PullRequestEvent)
 	if err != nil {
@@ -114,27 +102,49 @@ func handleGithub(w http.ResponseWriter, r *http.Request) {
 
 	case github.PushPayload:
 		push := payload.(github.PushPayload)
-		createBuild(token,
-			push.After,
-			push.HeadCommit.Message,
-			parseRef(push.Ref),
-			push.HeadCommit.Author.Email,
-			push.HeadCommit.Author.Name)
+		branch := parseRef(push.Ref)
+		group := fmt.Sprintf("%s-%s", push.After, branch)
+		requestGroup.Do(group, func() (interface{}, error) {
+			wb.createBuild(token,
+				push.After,
+				push.HeadCommit.Message,
+				branch,
+				push.HeadCommit.Author.Email,
+				push.HeadCommit.Author.Name, nil)
+
+			return nil, nil
+		})
 
 	case github.PullRequestPayload:
 		pullRequest := payload.(github.PullRequestPayload)
+		prLink := pullRequest.PullRequest.HTMLURL
+		if pullRequest.Action == "synchronize" {
+			branch := pullRequest.PullRequest.Head.Ref
+			sha := pullRequest.PullRequest.Head.Sha
+			group := fmt.Sprintf("%s-%s", sha, branch)
+			requestGroup.Do(group, func() (interface{}, error) {
+				wb.graphqlClient.UpdateBuild(&graphql.BuildUpdateParams{
+					Token:          token,
+					Commit:         sha,
+					Branch:         branch,
+					PullRequestURL: &prLink,
+				})
+				return nil, nil
+			})
+
+		}
 		if pullRequest.Action == "opened" {
-			createBuild(token,
+			wb.createBuild(token,
 				pullRequest.PullRequest.Head.Sha,
 				pullRequest.PullRequest.Title,
 				pullRequest.PullRequest.Head.Ref,
 				pullRequest.Sender.Login,
-				pullRequest.Sender.Login)
+				pullRequest.Sender.Login, &prLink)
 		}
 	}
 }
 
-func handleGitlab(w http.ResponseWriter, r *http.Request) {
+func (wb *Web) handleGitlab(w http.ResponseWriter, r *http.Request) {
 	token := extractToken(r)
 	payload, err := gitlabHook.Parse(r, gitlab.PushEvents)
 	if err != nil {
@@ -146,16 +156,16 @@ func handleGitlab(w http.ResponseWriter, r *http.Request) {
 
 	case gitlab.PushEventPayload:
 		push := payload.(gitlab.PushEventPayload)
-		createBuild(token,
+		wb.createBuild(token,
 			push.After,
 			push.Commits[0].Message,
 			parseRef(push.Ref),
 			push.Commits[0].Author.Email,
-			push.Commits[0].Author.Name)
+			push.Commits[0].Author.Name, nil)
 	}
 }
 
-func handleBitbucket(w http.ResponseWriter, r *http.Request) {
+func (wb *Web) handleBitbucket(w http.ResponseWriter, r *http.Request) {
 	token := extractToken(r)
 	fmt.Println(token)
 	payload, err := bitbucketHook.Parse(r, bitbucket.RepoPushEvent)
@@ -171,6 +181,6 @@ func handleBitbucket(w http.ResponseWriter, r *http.Request) {
 		commit := push.Push.Changes[0].New.Target.Hash
 		message := push.Push.Changes[0].New.Target.Message
 		ref := parseRef(push.Push.Changes[0].New.Type)
-		createBuild(token, commit, message, ref, push.Actor.Username, push.Actor.Username)
+		wb.createBuild(token, commit, message, ref, push.Actor.Username, push.Actor.Username, nil)
 	}
 }

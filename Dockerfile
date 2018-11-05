@@ -9,7 +9,7 @@ WORKDIR $GOPATH/src/github.com/kubebuild/webhooks
 COPY Gopkg.toml Gopkg.lock ./
 RUN dep ensure --vendor-only
 COPY . ./
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -a -installsuffix nocgo -o app main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -a -installsuffix nocgo -o app cmd/webhook/webhook.go
 
 FROM alpine:latest as certs
 RUN apk --update add ca-certificates
