@@ -26,8 +26,8 @@ type BuildUpdateParams struct {
 	PullRequestURL *string
 }
 
-//UpdateBuild creates a build
-func (c *Client) UpdateBuild(params *BuildUpdateParams) {
+//UpdateBuilds updates builds
+func (c *Client) UpdateBuilds(params *BuildUpdateParams) {
 	c.Log.WithFields(logrus.Fields{
 		"commit":         params.Commit,
 		"branch":         params.Branch,
@@ -36,7 +36,7 @@ func (c *Client) UpdateBuild(params *BuildUpdateParams) {
 	var buildMutation struct {
 		UpddateBuildByToken struct {
 			Successful gql.Boolean
-		} `graphql:"updateBuildByToken(token: $token, commit: $commit, branch: $branch, pullRequestUrl: $pullRequestUrl)"`
+		} `graphql:"updateBuildsByToken(token: $token, commit: $commit, branch: $branch, pullRequestUrl: $pullRequestUrl)"`
 	}
 	variables := map[string]interface{}{
 		"token":          params.Token,

@@ -123,7 +123,7 @@ func (wb *Web) handleGithub(w http.ResponseWriter, r *http.Request) {
 			sha := pullRequest.PullRequest.Head.Sha
 			group := fmt.Sprintf("%s-%s", sha, branch)
 			requestGroup.Do(group, func() (interface{}, error) {
-				wb.graphqlClient.UpdateBuild(&graphql.BuildUpdateParams{
+				wb.graphqlClient.UpdateBuilds(&graphql.BuildUpdateParams{
 					Token:          token,
 					Commit:         sha,
 					Branch:         branch,
