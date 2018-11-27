@@ -16,6 +16,8 @@ type BuildCreateParams struct {
 	UserEmail      string
 	UserName       string
 	PullRequestURL *string
+	IsPullRequest  *gql.Boolean
+	ErrorMessage   *string
 }
 
 //BuildUpdateParams update build
@@ -24,6 +26,7 @@ type BuildUpdateParams struct {
 	Commit         string
 	Branch         string
 	PullRequestURL *string
+	IsPullRequest  *gql.Boolean
 }
 
 //UpdateBuilds updates builds
@@ -32,17 +35,19 @@ func (c *Client) UpdateBuilds(params *BuildUpdateParams) {
 		"commit":         params.Commit,
 		"branch":         params.Branch,
 		"pullRequestUrl": params.PullRequestURL,
-	}).Debug("createBuild")
+		"isPullRequest":  params.IsPullRequest,
+	}).Debug("updateBuild")
 	var buildMutation struct {
 		UpddateBuildByToken struct {
 			Successful gql.Boolean
-		} `graphql:"updateBuildsByToken(token: $token, commit: $commit, branch: $branch, pullRequestUrl: $pullRequestUrl)"`
+		} `graphql:"updateBuildsByToken(token: $token, commit: $commit, branch: $branch, pullRequestUrl: $pullRequestUrl, isPullRequest: $isPullRequest)"`
 	}
 	variables := map[string]interface{}{
 		"token":          params.Token,
 		"commit":         params.Commit,
 		"branch":         params.Branch,
 		"pullRequestUrl": params.PullRequestURL,
+		"isPullRequest":  params.IsPullRequest,
 	}
 	err := c.GraphqlClient.Mutate(context.Background(), &buildMutation, variables)
 	if err != nil {
@@ -61,11 +66,12 @@ func (c *Client) CreateBuild(params *BuildCreateParams) {
 		"userEmail":      params.UserEmail,
 		"userName":       params.UserName,
 		"pullRequestUrl": params.PullRequestURL,
+		"isPullRequest":  params.IsPullRequest,
 	}).Debug("createBuild")
 	var buildMutation struct {
 		CreateBuildByToken struct {
 			Successful gql.Boolean
-		} `graphql:"createBuildByToken(token: $token, commit: $commit, message: $message, branch: $branch, userEmail: $userEmail, userName: $userName, pullRequestUrl: $pullRequestUrl)"`
+		} `graphql:"createBuildByToken(token: $token, commit: $commit, message: $message, branch: $branch, userEmail: $userEmail, userName: $userName, pullRequestUrl: $pullRequestUrl, isPullRequest: $isPullRequest)"`
 	}
 	variables := map[string]interface{}{
 		"token":          params.Token,
@@ -75,6 +81,7 @@ func (c *Client) CreateBuild(params *BuildCreateParams) {
 		"userEmail":      params.UserEmail,
 		"userName":       params.UserName,
 		"pullRequestUrl": params.PullRequestURL,
+		"isPullRequest":  params.IsPullRequest,
 	}
 	err := c.GraphqlClient.Mutate(context.Background(), &buildMutation, variables)
 	if err != nil {

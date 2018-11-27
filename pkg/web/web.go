@@ -10,6 +10,7 @@ import (
 	bugsnag "github.com/bugsnag/bugsnag-go"
 	"github.com/cloudflare/cfssl/log"
 	"github.com/kubebuild/webhooks/pkg/graphql"
+	gql "github.com/shurcooL/graphql"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 	"gopkg.in/go-playground/webhooks.v5/bitbucket"
@@ -65,7 +66,7 @@ func parseRef(ref string) string {
 	return branch
 }
 
-func (wb *Web) createBuild(token string, commit string, message string, branch string, userEmail string, userName string, pullRequestURL *string) {
+func (wb *Web) createBuild(token string, commit string, message string, branch string, userEmail string, userName string, pullRequestURL *string, isPullRequest *gql.Boolean) {
 	params := &graphql.BuildCreateParams{
 		Token:          token,
 		Commit:         commit,
@@ -74,6 +75,17 @@ func (wb *Web) createBuild(token string, commit string, message string, branch s
 		UserEmail:      userEmail,
 		UserName:       userName,
 		PullRequestURL: pullRequestURL,
+		IsPullRequest:  isPullRequest,
+	}
+	if isPullRequest == nil {
+		build, _ := wb.graphqlClient.QueryBuildForBranch(branch, token)
+		if build != nil {
+			params.IsPullRequest = build.IsPullRequest
+			if build.PullRequestUrl != nil {
+				url := fmt.Sprintf("%s", *build.PullRequestUrl)
+				params.PullRequestURL = &url
+			}
+		}
 	}
 	wb.graphqlClient.CreateBuild(params)
 }
@@ -110,13 +122,14 @@ func (wb *Web) handleGithub(w http.ResponseWriter, r *http.Request) {
 				push.HeadCommit.Message,
 				branch,
 				push.HeadCommit.Author.Email,
-				push.HeadCommit.Author.Name, nil)
+				push.HeadCommit.Author.Name, nil, nil)
 
 			return nil, nil
 		})
 
 	case github.PullRequestPayload:
 		pullRequest := payload.(github.PullRequestPayload)
+		isPullRequest := gql.Boolean(true)
 		prLink := pullRequest.PullRequest.HTMLURL
 		if pullRequest.Action == "synchronize" {
 			branch := pullRequest.PullRequest.Head.Ref
@@ -128,6 +141,7 @@ func (wb *Web) handleGithub(w http.ResponseWriter, r *http.Request) {
 					Commit:         sha,
 					Branch:         branch,
 					PullRequestURL: &prLink,
+					IsPullRequest:  &isPullRequest,
 				})
 				return nil, nil
 			})
@@ -139,20 +153,30 @@ func (wb *Web) handleGithub(w http.ResponseWriter, r *http.Request) {
 				pullRequest.PullRequest.Title,
 				pullRequest.PullRequest.Head.Ref,
 				pullRequest.Sender.Login,
-				pullRequest.Sender.Login, &prLink)
+				pullRequest.Sender.Login, &prLink, &isPullRequest)
 		}
 	}
 }
 
 func (wb *Web) handleGitlab(w http.ResponseWriter, r *http.Request) {
 	token := extractToken(r)
-	payload, err := gitlabHook.Parse(r, gitlab.PushEvents)
+	payload, err := gitlabHook.Parse(r, gitlab.PushEvents, gitlab.MergeRequestEvents)
 	if err != nil {
 		if err == github.ErrEventNotFound {
 			// ok event wasn;t one of the ones asked to be parsed
 		}
 	}
 	switch payload.(type) {
+
+	case gitlab.MergeRequestEventPayload:
+		isPullRequest := gql.Boolean(true)
+		merge := payload.(gitlab.MergeRequestEventPayload)
+		wb.createBuild(token,
+			merge.ObjectAttributes.LastCommit.ID,
+			merge.ObjectAttributes.LastCommit.Message,
+			merge.ObjectAttributes.SourceBranch,
+			merge.User.UserName,
+			merge.User.Name, &merge.ObjectAttributes.URL, &isPullRequest)
 
 	case gitlab.PushEventPayload:
 		push := payload.(gitlab.PushEventPayload)
@@ -161,7 +185,7 @@ func (wb *Web) handleGitlab(w http.ResponseWriter, r *http.Request) {
 			push.Commits[0].Message,
 			parseRef(push.Ref),
 			push.Commits[0].Author.Email,
-			push.Commits[0].Author.Name, nil)
+			push.Commits[0].Author.Name, nil, nil)
 	}
 }
 
@@ -181,6 +205,6 @@ func (wb *Web) handleBitbucket(w http.ResponseWriter, r *http.Request) {
 		commit := push.Push.Changes[0].New.Target.Hash
 		message := push.Push.Changes[0].New.Target.Message
 		ref := parseRef(push.Push.Changes[0].New.Type)
-		wb.createBuild(token, commit, message, ref, push.Actor.Username, push.Actor.Username, nil)
+		wb.createBuild(token, commit, message, ref, push.Actor.Username, push.Actor.Username, nil, nil)
 	}
 }
