@@ -171,12 +171,14 @@ func (wb *Web) handleGitlab(w http.ResponseWriter, r *http.Request) {
 	case gitlab.MergeRequestEventPayload:
 		isPullRequest := gql.Boolean(true)
 		merge := payload.(gitlab.MergeRequestEventPayload)
-		wb.createBuild(token,
-			merge.ObjectAttributes.LastCommit.ID,
-			merge.ObjectAttributes.LastCommit.Message,
-			merge.ObjectAttributes.SourceBranch,
-			merge.User.UserName,
-			merge.User.Name, &merge.ObjectAttributes.URL, &isPullRequest)
+		if merge.ObjectAttributes.Action == "open" {
+			wb.createBuild(token,
+				merge.ObjectAttributes.LastCommit.ID,
+				merge.ObjectAttributes.LastCommit.Message,
+				merge.ObjectAttributes.SourceBranch,
+				merge.User.UserName,
+				merge.User.Name, &merge.ObjectAttributes.URL, &isPullRequest)
+		}
 
 	case gitlab.PushEventPayload:
 		push := payload.(gitlab.PushEventPayload)
